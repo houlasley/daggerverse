@@ -1,53 +1,80 @@
+// A generated module for Cdk functions
+//
+// This module has been generated via dagger init and serves as a reference to
+// basic module structure as you get started with Dagger.
+//
+// Two functions have been pre-created. You can modify, delete, or add to them,
+// as needed. They demonstrate usage of arguments and return types using simple
+// echo and grep commands. The functions can be called from the dagger CLI or
+// from one of the SDKs.
+//
+// The first line in this comment block is a short description line and the
+// rest is a long description with more detail on the module's purpose or usage,
+// if appropriate. All modules should have a short description.
+
 package main
 
 import (
 	"context"
-	"fmt"
 
 	"dagger/cdk/internal/dagger"
 )
 
-type Cdk struct{}
+type CDK struct{}
 
-// `Main()` is the entry point for the Dagger execution
-func (m *Cdk) Build(ctx context.Context) (*dagger.Container, error) {
-	// 🔥 Build a Wolfi-based image with both Python & Node.js
-	finalImage := BuildWolfiImage(ctx, dag)
-
-	// 🛠 Verify Python & Node.js installation
-
-	// 🛠 Verify Python & Node.js installation
-
-	return finalImage, nil
+// Returns a container that echoes whatever string argument is provided
+func (m *CDK) ContainerEcho(stringArg string) *dagger.Container {
+	return dag.Container().From("alpine:latest").WithExec([]string{"echo", stringArg})
 }
 
-// 🔥 Build a minimal Wolfi-based image with both Python & Node.js
-func BuildWolfiImage(ctx context.Context, dag *dagger.Client) *dagger.Container {
-	// 🟢 Stage 1: Pull Wolfi's Node.js image
-	dag.Container().
-		From("cgr.dev/chainguard/node:latest").
-		Terminal()
+// Returns lines that match a pattern in the files of the provided Directory
+func (m *CDK) GrepDir(ctx context.Context, directoryArg *dagger.Directory, pattern string) (string, error) {
+	return dag.Container().
+		From("alpine:latest").
+		WithMountedDirectory("/mnt", directoryArg).
+		WithWorkdir("/mnt").
+		WithExec([]string{"grep", "-R", pattern, "."}).
+		Stdout(ctx)
+}
 
-	// 🟢 Stage 2: Pull Wolfi's Python image
-	python := dag.Container().
-		From("cgr.dev/chainguard/python:latest").
-		Terminal().
-		WithExec([]string{"python", "--version"}) // Ensure Python is available
+func (m *CDK) Synth(ctx context.Context, appDir *dagger.Directory) (*dagger.Directory, error) {
+	return dag.Container().
+		From("python:3.11").
+		WithExec([]string{"pip", "install", "uv"}).
+		WithMountedDirectory("/app", appDir).
+		WithWorkdir("/app").
+		WithExec([]string{"uv", "pip", "install"}).
+		WithExec([]string{"npm", "install", "-g", "aws-cdk"}).
+		WithExec([]string{"cdk", "synth"}).
+		Directory("cdk.out"), nil
+}
 
-	fmt.Println(python)
-	fmt.Println(python)
-	fmt.Println(python)
-	fmt.Println(python)
-	fmt.Println(python)
-	fmt.Println(python)
-	fmt.Println(python)
-	fmt.Println(python)
+func (m *CDK) Deploy(ctx context.Context, appDir *dagger.Directory, env, accountID string) error {
+	_, err := dag.Container().
+		From("python:3.11").
+		WithExec([]string{"pip", "install", "uv"}).
+		WithMountedDirectory("/app", appDir).
+		WithWorkdir("/app").
+		WithEnvVariable("AWS_REGION", "us-east-1").
+		WithEnvVariable("AWS_ACCOUNT", accountID).
+		WithExec([]string{"uv", "pip", "install"}).
+		WithExec([]string{"npm", "install", "-g", "aws-cdk"}).
+		WithExec([]string{"cdk", "deploy", "--require-approval", "never"}).
+		Sync(ctx)
+	return err
+}
 
-	// 🏗 Final Stage: Combine both into a minimal Wolfi-based image
-	finalImage := dag.Container().
-		From("cgr.dev/chainguard/wolfi-base:latest").
-		// Copy Node.js files explicitly
-		WithExec([]string{"ls"})
-
-	return finalImage
+func (m *CDK) Destroy(ctx context.Context, appDir *dagger.Directory, env, accountID string) error {
+	_, err := dag.Container().
+		From("python:3.11").
+		WithExec([]string{"pip", "install", "uv"}).
+		WithMountedDirectory("/app", appDir).
+		WithWorkdir("/app").
+		WithEnvVariable("AWS_REGION", "us-east-1").
+		WithEnvVariable("AWS_ACCOUNT", accountID).
+		WithExec([]string{"uv", "pip", "install"}).
+		WithExec([]string{"npm", "install", "-g", "aws-cdk"}).
+		WithExec([]string{"cdk", "destroy", "--force"}).
+		Sync(ctx)
+	return err
 }
